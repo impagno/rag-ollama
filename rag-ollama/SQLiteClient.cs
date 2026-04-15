@@ -1,8 +1,6 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Data.Sqlite;
-using System.Linq;
-using System.Threading.Tasks;
+
+namespace RagOllama.Data;
 
 /// <summary>
 /// Client for interacting with SQLite database for vector storage

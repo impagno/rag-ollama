@@ -1,22 +1,16 @@
-using System;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
 using System.Diagnostics;
+using System.Text;
+using OllamaSharp;
+using OllamaSharp.Models;
+
+namespace RagOllama.Client;
 
 /// <summary>
 /// Client for interacting with the Ollama API for text embeddings and generation
 /// </summary>
 public class OllamaClient
 {
-    private readonly HttpClient _http;
-    private readonly string _baseUrl;
-    private readonly string _embeddingsUrl;
-    private readonly string _completionsUrl;
+    private readonly OllamaApiClient _client;
 
     /// <summary>
     /// Initializes a new instance of the OllamaClient
@@ -24,13 +18,13 @@ public class OllamaClient
     /// <param name="baseUrl">Base URL of the Ollama API</param>
     public OllamaClient(string baseUrl = "http://localhost:11434")
     {
-        _baseUrl = baseUrl;
-        _embeddingsUrl = $"{baseUrl}/api/embeddings";
-        _completionsUrl = $"{baseUrl}/api/generate";
-        _http = new HttpClient
+        var httpClient = new HttpClient
         {
-            Timeout = TimeSpan.FromMinutes(5)
+            BaseAddress = new Uri(baseUrl),
+            Timeout = TimeSpan.FromMinutes(10) // Set your timeout here
         };
+
+        _client = new OllamaApiClient(httpClient);
     }
 
     /// <summary>
@@ -42,20 +36,26 @@ public class OllamaClient
     public async Task<float[]> GenerateEmbeddingAsync(string text, string model = "bge-large:335m")
     {
         Log.Debug($"Generating embedding using model '{model}'");
-        var body = new { model = model, prompt = text };
-        using var resp = await _http.PostAsJsonAsync(_embeddingsUrl, body);
-
-        string content = await resp.Content.ReadAsStringAsync();
-        if (!resp.IsSuccessStatusCode)
+        try
         {
-            Log.Error($"Embedding generation failed: {resp.StatusCode}\nRESPONSE:\n{content}");
-            throw new Exception("Failed to generate embedding.");
-        }
+            _client.SelectedModel = model;
+            var response = await _client.EmbedAsync(text);
+            var embedding = response.Embeddings.FirstOrDefault();
 
-        using var doc = JsonDocument.Parse(content);
-        var arr = doc.RootElement.GetProperty("embedding").EnumerateArray().Select(e => e.GetSingle()).ToArray();
-        Log.Debug($"Successfully generated embedding vector with {arr.Length} dimensions");
-        return arr;
+            if (embedding is null)
+            {
+                throw new Exception("Embedding response was empty.");
+            }
+
+            var arr = embedding.ToArray();
+            Log.Debug($"Successfully generated embedding vector with {arr.Length} dimensions");
+            return arr;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Embedding generation failed: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -71,40 +71,30 @@ public class OllamaClient
         Log.Debug($"Starting text generation with model '{model}' (max_tokens={maxTokens}, temp={temperature})");
         try
         {
-            var compPayload = new
-            {
-                model = model,
-                prompt = prompt,
-                max_tokens = maxTokens,
-                temperature = temperature,
-                stream = true
-            };
-            using var request = new HttpRequestMessage(HttpMethod.Post, _completionsUrl)
-            {
-                Content = JsonContent.Create(compPayload)
-            };
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
-
-            using var stream = await response.Content.ReadAsStreamAsync();
-            using var sr = new StreamReader(stream);
             var full = new StringBuilder();
             var sw = Stopwatch.StartNew();
-
-            while (!sr.EndOfStream)
+            var request = new GenerateRequest
             {
-                var line = await sr.ReadLineAsync();
-                if (string.IsNullOrWhiteSpace(line)) continue;
+                Model = model,
+                Prompt = prompt,
+                Stream = true,
+                Options = new RequestOptions
+                {
+                    NumPredict = maxTokens,
+                    Temperature = (float)temperature
+                }
+            };
 
-                using var partDoc = JsonDocument.Parse(line);
-                var part = partDoc.RootElement;
-                var chunk = part.GetProperty("response").GetString() ?? string.Empty;
-                var done = part.GetProperty("done").GetBoolean();
+            await foreach (var chunk in _client.GenerateAsync(request))
+            {
+                var text = chunk?.Response ?? string.Empty;
+                if (text.Length == 0)
+                {
+                    continue;
+                }
 
-                full.Append(chunk);
-                Log.Debug($"Received text chunk: {chunk.Length} chars (done={done})");
-
-                if (done) break;
+                full.Append(text);
+                Log.Debug($"Received text chunk: {text.Length} chars");
             }
 
             sw.Stop();

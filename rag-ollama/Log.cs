@@ -1,5 +1,3 @@
-using System;
-
 static class Log
 {
     private static readonly bool IsWindows = Environment.OSVersion.Platform == PlatformID.Win32NT;

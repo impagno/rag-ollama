@@ -1,7 +1,8 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
+using RagOllama.Client;
+using RagOllama.Data;
 using UglyToad.PdfPig;
+
+namespace RagOllama.Processors;
 
 /// <summary>
 /// Service responsible for processing PDF documents and storing their content in the vector database

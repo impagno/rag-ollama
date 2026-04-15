@@ -1,5 +1,3 @@
-using System;
-
 /// <summary>
 /// Centralized configuration class for the RAG application
 /// Contains all constants and configuration values

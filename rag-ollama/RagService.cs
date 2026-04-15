@@ -1,7 +1,8 @@
-using System;
-using System.Linq;
+using RagOllama.Client;
+using RagOllama.Data;
 using System.Text;
-using System.Threading.Tasks;
+
+namespace RagOllama.Service;
 
 /// <summary>
 /// Service responsible for handling RAG (Retrieval-Augmented Generation) operations
@@ -63,11 +64,11 @@ public class RagService
     private string BuildPrompt(string context, string question)
     {
         return new StringBuilder()
-            .AppendLine("Você é um assistente da NASA especializado em exploração espacial.")
-            .AppendLine("Use apenas o contexto abaixo para responder:\n")
+            .AppendLine("You are a NASA expert specialized in space exploration.")
+            .AppendLine("Use only the context below to answer:\n")
             .AppendLine(context)
-            .AppendLine($"\nPERGUNTA: {question}\n")
-            .Append("RESPOSTA:")
+            .AppendLine($"\nQUESTION: {question}\n")
+            .Append("ANSWER:")
             .ToString();
     }
 } 
