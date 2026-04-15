@@ -1,4 +1,4 @@
-This project uses Ollama and SQLite.
+This project uses Ollama and SQLite to aswer some questions about Artemis 2 mission.
 
 To install Ollama locally, please run the follow commands on PS:
 irm https://ollama.com/install.ps1 | iex
